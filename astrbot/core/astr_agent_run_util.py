@@ -51,17 +51,52 @@ def _record_tool_call_name(
 ) -> None:
     if not isinstance(tool_info, dict):
         return
+
     tool_call_id = tool_info.get("id")
     tool_name = tool_info.get("name")
     if tool_call_id is None or tool_name is None:
         return
-    tool_name_by_call_id[str(tool_call_id)] = str(tool_name)
+
+    tool_slugs = []
+    pending_values = [tool_info.get("args")]
+    while pending_values:
+        value = pending_values.pop()
+        if isinstance(value, dict):
+            tool_slug = value.get("tool_slug")
+            if isinstance(tool_slug, str) and tool_slug not in tool_slugs:
+                tool_slugs.append(tool_slug)
+            pending_values.extend(reversed(list(value.values())))
+        elif isinstance(value, list):
+            pending_values.extend(reversed(value))
+
+    display_name = str(tool_name)
+    if tool_slugs:
+        display_name = f"{display_name}({', '.join(tool_slugs)})"
+
+    tool_name_by_call_id[str(tool_call_id)] = display_name
 
 
 def _build_tool_call_status_message(tool_info: dict | None) -> str:
-    if tool_info:
-        return f"🔨 调用工具: {tool_info.get('name', 'unknown')}"
-    return "🔨 调用工具..."
+    if not isinstance(tool_info, dict):
+        return "🔨 Calling tool..."
+
+    tool_slugs: list[str] = []
+    pending_values = [tool_info.get("args")]
+    while pending_values:
+        value = pending_values.pop()
+        if isinstance(value, dict):
+            tool_slug = value.get("tool_slug")
+            if isinstance(tool_slug, str) and tool_slug not in tool_slugs:
+                tool_slugs.append(tool_slug)
+            pending_values.extend(reversed(list(value.values())))
+        elif isinstance(value, list):
+            pending_values.extend(reversed(value))
+
+    display_name = str(tool_info.get("name", "unknown"))
+    if tool_slugs:
+        display_name = f"{display_name}({', '.join(tool_slugs)})"
+
+    return f"🔨 Calling tool: {display_name}"
 
 
 def _build_tool_result_status_message(
@@ -81,9 +116,9 @@ def _build_tool_result_status_message(
         tool_result = msg_chain.get_plain_text(with_other_comps_mark=True)
     tool_result = _truncate_tool_result(tool_result, 70)
 
-    status_msg = f"🔨 调用工具: {tool_name}"
+    status_msg = f"🔨 Calling tool: {tool_name}"
     if tool_result:
-        status_msg = f"{status_msg}\n📎 返回结果: {tool_result}"
+        status_msg = f"{status_msg}\n📎 Result: {tool_result}"
     return status_msg
 
 

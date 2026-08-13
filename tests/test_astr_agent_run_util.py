@@ -4,7 +4,14 @@ from types import SimpleNamespace
 import pytest
 
 from astrbot.core.agent.response import AgentResponse
-from astrbot.core.astr_agent_run_util import _simulated_stream_tts, run_agent
+from astrbot.core.astr_agent_run_util import (
+    _build_tool_call_status_message,
+    _build_tool_result_status_message,
+    _record_tool_call_name,
+    _simulated_stream_tts,
+    run_agent,
+)
+from astrbot.core.message.components import Json
 from astrbot.core.message.message_event_result import MessageChain
 
 
@@ -73,6 +80,46 @@ async def test_run_agent_replaces_malformed_streaming_provider_error():
 
     assert len(chains) == 1
     assert chains[0].get_plain_text() == "Error occurred during AI execution."
+
+
+def test_tool_call_status_includes_unique_nested_tool_slugs():
+    tool_info = {
+        "id": "call-1",
+        "name": "multi_execute",
+        "args": {
+            "tools": [
+                {"tool_slug": "GMAIL_SEND_EMAIL"},
+                {"nested": {"tool_slug": "SLACK_SEND_MESSAGE"}},
+                {"tool_slug": "GMAIL_SEND_EMAIL"},
+            ]
+        },
+    }
+    tool_names: dict[str, str] = {}
+
+    _record_tool_call_name(tool_info, tool_names)
+
+    expected_name = "multi_execute(GMAIL_SEND_EMAIL, SLACK_SEND_MESSAGE)"
+    assert tool_names == {"call-1": expected_name}
+    assert (
+        _build_tool_call_status_message(tool_info)
+        == f"🔨 Calling tool: {expected_name}"
+    )
+
+
+def test_tool_result_status_uses_recorded_display_name_and_english_labels():
+    tool_names = {"call-1": "multi_execute(GMAIL_SEND_EMAIL)"}
+    chain = MessageChain(chain=[Json(data={"id": "call-1", "result": "Email sent"})])
+
+    status = _build_tool_result_status_message(chain, tool_names)
+
+    assert status == (
+        "🔨 Calling tool: multi_execute(GMAIL_SEND_EMAIL)\n📎 Result: Email sent"
+    )
+    assert tool_names == {}
+
+
+def test_tool_call_status_handles_missing_tool_info():
+    assert _build_tool_call_status_message(None) == "🔨 Calling tool..."
 
 
 @pytest.mark.asyncio
