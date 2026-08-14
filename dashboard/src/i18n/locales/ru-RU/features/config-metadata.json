@@ -1693,11 +1693,11 @@
                 "description": "Ключ Coze API для доступа к сервисам Coze."
             },
             "api_base": {
-                "description": "Bot ID"
+                "description": "API Base URL"
             },
             "proxy": {
-                "description": "API Base URL",
-                "hint": "Индивидуальный прокси для этого провайдера."
+                "description": "Адрес прокси",
+                "hint": "HTTP/HTTPS-прокси для этого провайдера."
             },
             "model": {
                 "description": "Имя модели",
