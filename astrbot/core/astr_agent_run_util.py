@@ -19,6 +19,7 @@ from astrbot.core.persona_error_reply import (
 )
 from astrbot.core.provider.entities import LLMResponse
 from astrbot.core.provider.provider import TTSProvider
+from astrbot.core.utils.tool_call_formatter import format_tool_call_arguments
 
 AgentRunner = ToolLoopAgentRunner[AstrAgentContext]
 
@@ -57,46 +58,23 @@ def _record_tool_call_name(
     if tool_call_id is None or tool_name is None:
         return
 
-    tool_slugs = []
-    pending_values = [tool_info.get("args")]
-    while pending_values:
-        value = pending_values.pop()
-        if isinstance(value, dict):
-            tool_slug = value.get("tool_slug")
-            if isinstance(tool_slug, str) and tool_slug not in tool_slugs:
-                tool_slugs.append(tool_slug)
-            pending_values.extend(reversed(list(value.values())))
-        elif isinstance(value, list):
-            pending_values.extend(reversed(value))
-
-    display_name = str(tool_name)
-    if tool_slugs:
-        display_name = f"{display_name}({', '.join(tool_slugs)})"
-
-    tool_name_by_call_id[str(tool_call_id)] = display_name
+    tool_name_by_call_id[str(tool_call_id)] = str(tool_name)
 
 
 def _build_tool_call_status_message(tool_info: dict | None) -> str:
     if not isinstance(tool_info, dict):
         return "🔨 Calling tool..."
 
-    tool_slugs: list[str] = []
-    pending_values = [tool_info.get("args")]
-    while pending_values:
-        value = pending_values.pop()
-        if isinstance(value, dict):
-            tool_slug = value.get("tool_slug")
-            if isinstance(tool_slug, str) and tool_slug not in tool_slugs:
-                tool_slugs.append(tool_slug)
-            pending_values.extend(reversed(list(value.values())))
-        elif isinstance(value, list):
-            pending_values.extend(reversed(value))
-
     display_name = str(tool_info.get("name", "unknown"))
-    if tool_slugs:
-        display_name = f"{display_name}({', '.join(tool_slugs)})"
-
-    return f"🔨 Calling tool: {display_name}"
+    summary = format_tool_call_arguments(tool_info.get("args"))
+    lines = [f"🔨 Calling tool: {display_name}"]
+    if summary.actions:
+        lines.append(f"🧰 {' · '.join(summary.actions)}")
+    if summary.intention:
+        lines.append(f"💭 {summary.intention}")
+    if summary.details:
+        lines.append(f"📎 {summary.details}")
+    return "\n".join(lines)
 
 
 def _build_tool_result_status_message(

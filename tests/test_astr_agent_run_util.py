@@ -98,12 +98,11 @@ def test_tool_call_status_includes_unique_nested_tool_slugs():
 
     _record_tool_call_name(tool_info, tool_names)
 
-    expected_name = "multi_execute(GMAIL_SEND_EMAIL, SLACK_SEND_MESSAGE)"
-    assert tool_names == {"call-1": expected_name}
-    assert (
-        _build_tool_call_status_message(tool_info)
-        == f"🔨 Calling tool: {expected_name}"
-    )
+    assert tool_names == {"call-1": "multi_execute"}
+    status = _build_tool_call_status_message(tool_info)
+    assert status.startswith("🔨 Calling tool: multi_execute\n")
+    assert "🧰 GMAIL_SEND_EMAIL · SLACK_SEND_MESSAGE" in status
+    assert "tools: 3 items" not in status
 
 
 def test_tool_result_status_uses_recorded_display_name_and_english_labels():
